@@ -1,0 +1,238 @@
+<template>
+  <div class="panel panel-default panelContent" >
+    <div class="field">
+      <div class="title">
+        <div class="topic">
+          {{{name}}}管理
+        </div>
+
+        <div class="button">
+          <Button type="primary" shape="circle" @click="addStation()" style="height: 24px;font-size: 14px;padding: 1px 15px;background-color:#2c9ae8">
+            <Icon type="plus-round" size="14" ></Icon>
+            添加{{{name}}}
+          </Button>
+        </div>
+
+        <div class="searchInput">
+          <Input v-model="value" placeholder="请输入{{{name}}}名称" style="width: 120px"></Input>
+        </div>
+        <div class="searchBtn">
+          <Button type="primary" @click="searchStations()" style="width: 60px;height: 24px;padding: 3px 15px;background-color:#2c9ae8">
+            <Icon type="ios-search-strong" size="16"></Icon>
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <Table stripe :columns="columns1" :data="data"></Table>
+        <nav v-if="pages>1">
+          <ul class="pagination">
+            <li><a @click="selectPage(1)"><<</a></li>
+            <li><a @click="selectPage(currentPage - 1)">&lt;</a></li>
+            <li><a>{{currentPage}}/{{pages}}</a></li>
+            <li><a @click="selectPage(currentPage + 1)">&gt;</a></li>
+            <li><a @click="selectPage(pages)">&gt;&gt;</a></li>
+          </ul>
+        </nav>
+      </div>
+      <Modal
+        v-model="modal1"
+        title="Common Modal dialog box title"
+        @on-ok=""
+        @on-cancel="modal1 = false">
+        <p slot="header">
+          <span v-if="add">添加{{{name}}}</span>
+          <span v-if="!add">编辑{{{name}}}</span>
+          <span class="titleLeft" @click="handleReset('formData')">
+          <img src="src/images/warning/webqt_iocn.png" alt="close">
+        </span>
+        </p>
+          <Form ref="formData" :model="formData" :rules="ruleValidate" :label-width="80">
+            <FormItem label="{{{name}}}名称" prop="name">
+              <Input v-model="formData.name" placeholder="请输入{{{name}}}名称"></Input>
+            </FormItem>
+          </Form>
+        <div slot="footer">
+          <Button type="primary" size="large" @click="handleSubmit('formData')">确定</Button>
+          <Button type="text" size="large" @click="handleReset('formData')">取消</Button>
+        </div>
+      </Modal>
+    </div>
+  </div>
+</template>
+<style scoped src="src/css/systemManage/station.css"></style>
+<script>
+  export default {
+    name: '{{{englishName}}}',
+    data () {
+      return {
+        modal1: false,
+        data: [],
+        value: '',
+        currentPage:1,
+        add:true,
+        table_isLoading:false,
+        formData:{
+          name:'',
+          id:''
+        },
+        ruleValidate:{
+          name: [
+            { required: true, message: 'The name cannot be empty', trigger: 'blur' }
+          ]
+        },
+        columns1: [
+          <% buildCode="table"
+          {
+            title: '{{{title}}}',
+            key:'{{{key}}}'
+          },
+          %>
+          {
+            title: '更新时间',
+            render: (h, params) =>new Date(params.row.updateDate).format('yyyy.MM.dd')
+          },
+          {
+            title: '操作',
+            render: (h, params) => {
+              return h('div', [
+                h('Button', {
+                  props: {
+                    type: 'text',
+                    size: 'small',
+                    icon:'compose'
+                  },
+                  style: {
+                    color:'#2c9ae8',
+                  },
+                    on:{
+                        'click':()=>{
+                            this.editStation(params.index,params.row.{{{idName}}});
+                        }
+                }
+                }, '编辑'),
+                h('Button', {
+                  props: {
+                    type: 'text',
+                    size: 'small',
+                    icon:'close-round'
+                  },
+                  style: {
+                    color:'#2c9ae8',
+                  },
+                    on:{
+                        'click':()=>{
+                            this.deleteStation(params.row.{{{idName}}});
+                        }
+                    }
+                }, '删除')
+              ]);
+            }
+          }
+        ]
+      }
+    },
+      created () {
+          this.table_isLoading = true;
+          this.init();
+      },
+      methods:{
+          init(){
+              var this_obj = this;
+              this_obj.data = [];
+              this_obj.pages = 0;
+              var url = '{{{interfaceName}}}/pageNum/'+this_obj.currentPage+'/pageSize/10';
+              this.$http.get(url).then(res => {
+                  this.table_isLoading = false;
+                  this_obj.pages = Math.ceil(res.data.obj.sum/10);
+                  this_obj.data = res.data.obj.{{{dataName}}};
+              });
+          },
+          handleSubmit (name) {
+              var this_obj = this;
+              this.$refs[name].validate((valid) => {
+                  if (valid) {
+                      var postData={};
+                      postData.name=this_obj.formData.name;
+                      if(!this.add){
+                          var url = '{{{interfaceName}}}/'+this_obj.formData.id;
+                          this_obj.$http.put(url,postData).then(res => {
+                              this_obj.$Message.success('保存成功');
+                              this_obj.modal1=false;
+                              this_obj.init();
+                          });
+                      }else{
+                          var url = '{{{interfaceName}}}';
+                          this_obj.$http.post(url,postData).then(res => {
+                              this_obj.$Message.success('保存成功');
+                              this_obj.modal1=false;
+                              this_obj.init();
+                          });
+                      }
+                  } else {
+                      this_obj.$Message.error('请认真填写表单');
+                  }
+              })
+          },
+          handleReset (name) {
+              this.modal1=false;
+          },
+
+          selectPage(page){
+              if(page >= this.pages){
+                  this.currentPage = this.pages
+              }else if(page <=0){
+                  this.currentPage = 0
+              }else{
+                  this.currentPage = page;
+              }
+              this.init();
+          },
+          addStation:function () {
+              this.$refs['formData'].resetFields();
+              this.add= true;
+              this.modal1 = true;
+          },
+          editStation:function(index,param){
+              this.$refs['formData'].resetFields();
+              this.add= false;
+              this.modal1 = true;
+              this.formData.name = this.data[index].{{{nameName}}};
+              this.formData.id = param;
+          },
+          deleteStation:function(param){
+              var this_obj = this;
+              var url = '{{{interfaceName}}}/'+param;
+              this.$http.delete(url).then(res => {
+                  if(res.data.code == 0){
+                      this_obj.$Message.success('删除成功');
+                      this_obj.init();
+                  }
+              })
+          },
+          searchStations:function(){
+              this.table_isLoading = true;
+              var this_obj = this;
+              var keywords = this.value;
+              console.log(keywords);
+              var url = '{{{interfaceSearch}}}/'+keywords;
+              if(keywords == ''){
+                  this.init();
+              }else{
+                  this.$http.get(url).then(res=>{
+                      this.table_isLoading = false;
+                      if(res.data.obj === undefined){
+                          this_obj.$Message.success('暂无所查找数据')
+                      }else{
+                          this_obj.data=[];
+                          this_obj.data.push(res.data.obj);
+                      }
+                      console.log(res);
+
+                  })
+              }
+
+          }
+      }
+  }
+</script>
